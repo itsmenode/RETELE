@@ -5,7 +5,7 @@
 #include <string>
 #include <iostream>
 
-class SignUpCommand: Command {
+class SignUpCommand: public Command {
     std::string user;
     std::string password;
 

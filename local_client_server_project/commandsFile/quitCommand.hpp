@@ -10,7 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-class QuitCommand: Command {
+class QuitCommand: public Command {
 
 public:
 

@@ -7,13 +7,7 @@
 #include <stdexcept>
 
 class SessionManager {
-
-private:
     
-
-    SessionManager() = default;
-    ~SessionManager() = default;
-
 public:
 
     static SessionManager& instance() {

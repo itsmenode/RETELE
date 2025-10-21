@@ -5,7 +5,7 @@
 #include <string>
 #include <iostream>
 
-class LogoutCommand: Command {
+class LogoutCommand: public Command {
     std::string user;
 
 public:
