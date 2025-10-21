@@ -176,6 +176,35 @@ public:
 
     }
 
+    bool isAnyUserAuthenticated() {
+
+        std::ifstream in("user.txt");
+        if(!in) {
+            return false;
+        }
+
+        std::string line;
+        while (std::getline(in, line)) {
+
+            if (line.empty() || line[0] == '#') continue;
+
+            std::size_t usrPosition = line.find(':');
+            if (usrPosition == std::string::npos) continue;
+
+            std::size_t pwdPosition = line.find(':', usrPosition + 1);
+            if (pwdPosition == std::string::npos) continue;
+
+            std::string usr = line.substr(0, usrPosition);
+            std::string status = line.substr(pwdPosition + 1);
+
+            if (status == "active") return true;
+
+        }
+
+        return false;
+
+    }
+
     bool userExists(const std::string &user) {
 
         std::ifstream in("users.txt");

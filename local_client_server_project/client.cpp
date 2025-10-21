@@ -1,0 +1,12 @@
+#include <iostream>
+#include <fstream>
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/command.hpp"
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/commandFactory.hpp"
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/getLoggedUsersCommand.hpp"
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/getProcInfoCommand.hpp"
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/loginCommand.hpp"
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/logoutCommand.hpp"
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/quitCommand.hpp"
+#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/commandsFile/signUpCommand.hpp"
+#include "errorHandling.hpp"
+#include "sessionManager.hpp"

@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 
 #include <fstream>
 #include <string>
@@ -26,8 +26,6 @@ public:
             throw FileException("Could not open userLogin_Log.txt file for keeping log.\n");
         }
 
-        out << "User: " << user << " Login Status: [ACTIVE] || " << "Time: [ ";
-
         ///std::ofstream out("activity_Log.txt", std::ios::app);
 
     }
@@ -44,4 +42,4 @@ private:
     Logger() = default;
     ~Logger() = default;
 
-};
+};*/

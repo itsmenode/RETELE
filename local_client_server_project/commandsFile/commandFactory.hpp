@@ -14,13 +14,19 @@
 class CommandFactory{
 public:
 
-    struct Command* createCommand(const std::string& comm, const std::string& value1, const std::string& value2) {
+    struct Command* createCommand(const std::string& comm, const std::string& username, const std::string& password, const pid_t& pid) {
         if (comm == "login"){
-            return new LoginCommand(value1, value2);
+            return new LoginCommand(username, password);
         } else if (comm == "logout") {
-            return new LogoutCommand(value1);
+            return new LogoutCommand(username);
         } else if (comm == "singup") {
-            return new SignUpCommand(value1, value2);
+            return new SignUpCommand(username, password);
+        } else if (comm == "quit") {
+            return new QuitCommand();
+        } else if (comm == "get-logged-users") {
+            return new GetLoggedUsersCommand();
+        } else if (comm == "get_proc_info") {
+            return new GetProcInfoCommand(pid);
         } else if (comm == "quit") {
             return new QuitCommand();
         }
