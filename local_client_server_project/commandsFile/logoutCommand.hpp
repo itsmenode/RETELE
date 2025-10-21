@@ -2,6 +2,7 @@
 
 #include "command.hpp"
 #include "errorHandling.hpp"
+#include "../sessionManager.hpp"
 #include <string>
 #include <iostream>
 

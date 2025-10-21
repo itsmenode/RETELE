@@ -1,6 +1,6 @@
 #pragma once
 
-#include "/home/andrew/Documents/GitHub/RETELE/local_client_server_project/sessionManager.hpp"
+#include "sessionManager.hpp"
 #include <iostream>
 #include <stdexcept>
 #include <string>

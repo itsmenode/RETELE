@@ -2,7 +2,7 @@
 
 #include "command.hpp"
 #include "errorHandling.hpp"
-#include "sessionManager.hpp"
+#include "../sessionManager.hpp"
 #include <fstream>
 #include <iostream>
 #include <string>
