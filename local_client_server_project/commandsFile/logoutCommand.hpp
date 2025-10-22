@@ -1,20 +1,18 @@
 #pragma once
 
 #include "command.hpp"
-#include "errorHandling.hpp"
+#include "../errorHandling.hpp"
 #include "../sessionManager.hpp"
 #include <string>
 #include <iostream>
+#include <utility>
 
-class LogoutCommand: public Command {
+class LogoutCommand : public Command {
     std::string user;
-
 public:
-    LogoutCommand(std::string user) : user(move(user)) {}
-
+    explicit LogoutCommand(std::string u) : user(std::move(u)) {}
     void execute() override {
         SessionManager::instance().logout(user);
-        std::cout << "User: " << user << " Status: INACTIVE.\n";
+        std::cout << "User '" << user << "' logged out (INACTIVE)\n";
     }
-
 };

@@ -1,115 +1,141 @@
+
 #include "./commandsFile/command.hpp"
 #include "./commandsFile/commandFactory.hpp"
-#include "./commandsFile/getLoggedUsersCommand.hpp"
-#include "./commandsFile/getProcInfoCommand.hpp"
-#include "./commandsFile/loginCommand.hpp"
-#include "./commandsFile/logoutCommand.hpp"
-#include "./commandsFile/quitCommand.hpp"
-#include "./commandsFile/signUpCommand.hpp"
-#include "errorHandling.hpp"
 #include "sessionManager.hpp"
+#include "errorHandling.hpp"
+#include "protocol.hpp"
 #include <iostream>
 #include <unistd.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <string>
-#include <cstring>
-#include <sys/wait.h>
-#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <cstring>
 
-using namespace std;
+static const char* CMD_FIFO = "/tmp/cmd_fifo";
+static const char* RESP_FIFO = "/tmp/resp_fifo";
 
-static string trim(string s) {
-    const char* ws = " \t";
-    size_t a = s.find_first_not_of(ws);
-    size_t b = s.find_last_not_of(ws);
-    if (a == string::npos) return "";
-    return s.substr(a, b - a + 1);
+static void write_all(int fd, const void* buf, size_t len) {
+    const char* p = static_cast<const char*>(buf);
+    while (len > 0) {
+        ssize_t n = write(fd, p, len);
+        if (n <= 0) _exit(1);
+        p += n; len -= n;
+    }
+}
+static bool read_all(int fd, void* buf, size_t len) {
+    char* p = static_cast<char*>(buf);
+    while (len > 0) {
+        ssize_t n = read(fd, p, len);
+        if (n <= 0) return false;
+        p += n; len -= n;
+    }
+    return true;
 }
 
+int main() {
 
-static void parse_command(const string& input, string& command, string& arg1, string& arg2) {
-    string s = input;
-    size_t p1 = s.find(':');
-    if (p1 == string::npos) {
-        command = trim(s);
-        arg1.clear();
-        arg2.clear();
-        return;
+    mkfifo(CMD_FIFO, 0666);
+    mkfifo(RESP_FIFO, 0666);
+
+    SessionManager::instance().set_db_path("users.db");
+
+    int cmd_fd = open(CMD_FIFO, O_RDONLY);
+    if (cmd_fd < 0) {
+        perror("open cmd fifo");
+        return 1;
     }
 
-    command = trim(s.substr(0, p1));
-    string rest = (p1 + 1 < s.size()) ? s.substr(p1 + 1) : "";
-
-    size_t p2 = rest.find(':');
-    if (p2 == string::npos) {
-        arg1 = trim(rest);
-        arg2.clear();
-        return;
+    int resp_fd = open(RESP_FIFO, O_WRONLY);
+    if (resp_fd < 0) {
+        perror("open resp fifo");
+        return 1;
     }
-
-    arg1 = trim(rest.substr(0, p2));
-    arg2 = trim(rest.substr(p2 + 1));
-}
-
-
-int main(){
-
-    int client_to_server = open("client_to_server", O_WRONLY);
-
-    int lungime_comanda;
-    char comanda[10000];
 
     while (true) {
+        uint32_t len = 0;
+        if (!read_all(cmd_fd, &len, sizeof(len))) break;
 
-        read(client_to_server, &lungime_comanda, sizeof(int));
-        read(client_to_server, comanda, sizeof(char) * lungime_comanda);
+        std::string cmd(len, '\0');
+        if (!read_all(cmd_fd, cmd.data(), len)) break;
 
+        cmd = trim(cmd);
 
         int sv[2];
         if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == -1) {
-            throw UncategorisedError("Could not create socket.\n");
+            perror("socketpair"); break;
         }
 
         pid_t pid = fork();
-        if (pid < 0) {
-            throw UncategorisedError("Could not create server sided child proccess.\n");
-        }
-
         if (pid == 0) {
             close(sv[0]);
-            char buf[256];
+            dup2(sv[1], STDOUT_FILENO);
+            dup2(sv[1], STDERR_FILENO);
+            close(sv[1]);
 
-            ssize_t n = read(sv[1], buf, sizeof(buf) - 1);
+            
+            try {std::string name = cmd;
+                std::string arg = "";
+                auto parts = split(cmd, ':');
+                if (parts.size() >= 1) name = trim(parts[0]);
+                if (parts.size() >= 2) arg = trim(parts[1]);
 
-            buf[n] = '\0';
+                std::string user, pass;
+                pid_t cpid = 0;
 
-            string cmd, a1, a2;
+                if (name == "login" || name == "signup" || name == "singup") {
+                    auto toks = split(arg, ' ');
+                    if (toks.size() < 2) throw InvalidCommandException("Usage: login: <user> <pass>");
+                    user = toks[0];
+                    pass = toks[1];
+                } else if (name == "logout") {
+                    user = trim(arg);
+                    if (user.empty()) throw InvalidCommandException("Usage: logout: <user>");
+                } else if (name == "get-proc-info") {
+                    cpid = static_cast<pid_t>(std::stol(arg));
+                }
 
-            parse_command(buf, cmd, a1, a2);
-            pid_t pid2 = static_cast<pid_t>(std::stol(a1));
+                Command* c = CommandFactory::create(name, user, pass, cpid);
+                c->execute();
+                delete c;
+            } catch (const std::exception& e) {
+                std::cout << "ERROR: " << e.what() << "\n";
+            }
+            _exit(0);
+        } else if (pid > 0) {
 
-            CommandFactory factory;
+            close(sv[1]);
 
-            Command* commandPtr = factory.createCommand(cmd, a1, a2, pid2);
-            if (commandPtr) {
-                commandPtr->execute();
-                delete commandPtr;
+            std::string buf;
+            char tmp[4096];
+
+            ssize_t n;
+            while ((n = read(sv[0], tmp, sizeof(tmp))) > 0) {
+                buf.append(tmp, tmp + n);
             }
 
-            close(sv[1]);
+            close(sv[0]);
+            waitpid(pid, nullptr, 0);
 
+            uint32_t out_len = (uint32_t)buf.size();
+            
+            write_all(resp_fd, &out_len, sizeof(out_len));
+            if (out_len) write_all(resp_fd, buf.data(), out_len);
+
+            if (cmd == "quit") {
+                break;
+            }
 
         } else {
-
-            close(sv[1]);
-
-            write(sv[0], comanda, strlen(comanda));
-            
-            close(sv[0]);
-            waitpid(pid, NULL, 0);
+            perror("fork");
+            break;
         }
-
     }
+
+    close(cmd_fd);
+    close(resp_fd);
+    unlink(CMD_FIFO);
+    unlink(RESP_FIFO);
+
+    return 0;
 }

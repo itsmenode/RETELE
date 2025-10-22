@@ -1,82 +1,111 @@
-#include "./commandsFile/command.hpp"
-#include "./commandsFile/commandFactory.hpp"
-#include "./commandsFile/getLoggedUsersCommand.hpp"
-#include "./commandsFile/getProcInfoCommand.hpp"
-#include "./commandsFile/loginCommand.hpp"
-#include "./commandsFile/logoutCommand.hpp"
-#include "./commandsFile/quitCommand.hpp"
-#include "./commandsFile/signUpCommand.hpp"
-#include "errorHandling.hpp"
-#include "sessionManager.hpp"
 #include <iostream>
-#include <unistd.h>
-#include <stdlib.h>
-#include <fcntl.h>
 #include <string>
-#include <cstring>
-#include <sys/wait.h>
-#include <sys/types.h>
+#include <unistd.h>
 #include <sys/stat.h>
-#include <stdio.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <cstring>
+#include <cstdint>
 
-using namespace std;
+static const char* CMD_FIFO = "/tmp/cmd_fifo";
+static const char* RESP_FIFO = "/tmp/resp_fifo";
 
-int main(){
-
-    mkfifo("client_to_server", 0666);
-    int client_to_server = open("client_to_server", O_WRONLY);
-
-    while(true){
-
-        string input;
-        cout << "Enter Command: ";
-        getline(cin, input);
-        int lungime_comanda = input.size();
-
-        int send_for_review[2];
-        if (pipe(send_for_review) == -1) {
-            throw UncategorisedError("Could not create pipe for communication between father and child.\n");
+static void write_all(int fd, const void* buf, size_t len) {
+    const char* p = static_cast<const char*>(buf);
+    while (len > 0) {
+        ssize_t n = write(fd, p, len);
+        if (n <= 0) {
+            perror("write");
+            _exit(1);
         }
-
-        pid_t pid = fork();
-        if (pid < 0) {
-            throw UncategorisedError("Could not create child proccess.]n");
-        }
-
-        if (pid == 0) {
-
-            close(send_for_review[1]);
-
-            string line;
-            line.resize(1024);
-            ssize_t n = read(send_for_review[0], line.data(), line.size());
-            if (n < 0) {
-                throw UncategorisedError("Could not read from pipe.\n");
-            }
-
-            line.resize(static_cast<size_t>(n));
-            int marime = static_cast<int>(line.size());
-
-            write(client_to_server, &marime, sizeof(int));
-            if (marime > 0) {
-                write(client_to_server, line.data(), static_cast<size_t>(marime));
-            }
-
-            close(send_for_review[0]);
-
-        } else {
-
-            close(send_for_review[0]);
-
-            ssize_t n = write(send_for_review[1], input.data(), static_cast<size_t>(lungime_comanda));
-            if (n < 0) {
-                close(send_for_review[1]);
-                throw UncategorisedError("Could not write in the pipe.\n");
-            }
-
-            close(send_for_review[1]);
-            waitpid(pid, NULL, 0);
-
-        }
+        p += n; len -= n;
     }
+}
+
+static bool read_all(int fd, void* buf, size_t len) {
+    char* p = static_cast<char*>(buf);
+    while (len > 0) {
+        ssize_t n = read(fd, p, len);
+        if (n <= 0) return false;
+        p += n; len -= n;
+    }
+    return true;
+}
+
+int main() {
+    mkfifo(CMD_FIFO, 0666);
+    mkfifo(RESP_FIFO, 0666);
+
+    int pfd[2];
+    if (pipe(pfd) == -1) {
+        perror("pipe");
+        return 1;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return 1;
+    }
+
+    if (pid == 0) {
+        close(pfd[1]);
+
+        int cmd_fd = open(CMD_FIFO, O_WRONLY);
+        if (cmd_fd < 0) {
+            perror("open cmd fifo");
+            return 1;
+        }
+        int resp_fd = open(RESP_FIFO, O_RDONLY);
+        if (resp_fd < 0) {
+            perror("open resp fifo");
+            return 1;
+        }
+
+        while (true) {
+            uint32_t len = 0;
+            if (!read_all(pfd[0], &len, sizeof(len))) break;
+            
+            std::string line(len, '\0');
+            if (len && !read_all(pfd[0], line.data(), len)) break;
+
+            
+            write_all(cmd_fd, &len, sizeof(len));
+            if (len) write_all(cmd_fd, line.data(), len);
+
+            
+            uint32_t out_len = 0;
+            if (!read_all(resp_fd, &out_len, sizeof(out_len))) break;
+            std::string out(out_len, '\0');
+            if (out_len && !read_all(resp_fd, out.data(), out_len)) break;
+
+            if (!out.empty()) std::cout << out;
+
+            if (line == "quit") break;
+        }
+
+        close(cmd_fd);
+        close(resp_fd);
+        close(pfd[0]);
+        _exit(0);
+
+    } else {
+        close(pfd[0]);
+
+        std::string line;
+        std::cout << "Enter commands (e.g. 'signup: user pass', 'login: user pass', 'logout: user', 'get-logged-users', 'get-proc-info: 1', 'quit')\n";
+        while (true) {
+            std::cout << "> ";
+            if (!std::getline(std::cin, line)) break;
+
+            uint32_t len = (uint32_t)line.size();
+            write_all(pfd[1], &len, sizeof(len));
+            if (len) write_all(pfd[1], line.data(), len);
+
+            if (line == "quit") break;
+        }
+        close(pfd[1]);
+        waitpid(pid, nullptr, 0);
+    }
+    return 0;
 }

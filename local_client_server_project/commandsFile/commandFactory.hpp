@@ -1,5 +1,5 @@
-#pragma once
 
+#pragma once
 #include "command.hpp"
 #include "loginCommand.hpp"
 #include "logoutCommand.hpp"
@@ -7,19 +7,19 @@
 #include "signUpCommand.hpp"
 #include "getLoggedUsersCommand.hpp"
 #include "getProcInfoCommand.hpp"
-#include <iostream>
+#include "../errorHandling.hpp"
 #include <string>
-#include <memory>
+#include <cctype>
+#include <sstream>
 
-class CommandFactory{
+class CommandFactory {
 public:
-
-    struct Command* createCommand(const std::string& comm, const std::string& username, const std::string& password, const pid_t& pid) {
-        if (comm == "login"){
+    static Command* create(const std::string& comm, const std::string& username = "", const std::string& password = "", pid_t pid = 0) {
+        if (comm == "login") {
             return new LoginCommand(username, password);
         } else if (comm == "logout") {
             return new LogoutCommand(username);
-        } else if (comm == "singup") {
+        } else if (comm == "signup") {
             return new SignUpCommand(username, password);
         } else if (comm == "quit") {
             return new QuitCommand();
@@ -27,9 +27,7 @@ public:
             return new GetLoggedUsersCommand();
         } else if (comm == "get-proc-info") {
             return new GetProcInfoCommand(pid);
-        } else if (comm == "quit") {
-            return new QuitCommand();
         }
+        throw InvalidCommandException("Unknown command: " + comm);
     }
-
 };

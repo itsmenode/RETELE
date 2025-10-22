@@ -1,238 +1,97 @@
-#pragma once
 
+#pragma once
 #include "errorHandling.hpp"
 #include <fstream>
 #include <string>
 #include <vector>
-#include <stdexcept>
+#include <sstream>
+#include <optional>
 
+// Very small file‑backed user/session store.
+// Format per line: username:password:active|inactive
 class SessionManager {
-    
 public:
-
     static SessionManager& instance() {
         static SessionManager inst;
         return inst;
     }
 
-    void signup(const std::string& user, const std::string& password) {
-        if (userExists(user)){
-            throw UserException("User: " + user + " does ALREADY EXISTS.");
+    void set_db_path(const std::string& path) { db_path = path; }
+
+    void signup(const std::string& user, const std::string& pass) {
+        auto users = load();
+        for (auto& u : users) {
+            if (u.username == user) {
+                throw UserException("User already exists: " + user);
+            }
         }
-
-        std::ifstream in("users.txt");
-        if(!in) {
-            throw FileException("Could NOT OPEN file: users.txt for INPUT");
-        }
-
-        std::ofstream out("users.txt", std::ios::app);
-        if (!out) {
-            throw FileException("Could NOT OPEN file: users.txt for OUTPUT");
-        }
-
-        out << user << ':' << password << ':' << "inactive" << '\n';
-
-        out.close();
+        users.push_back({user, pass, false});
+        save(users);
     }
 
-    void login(const std::string& user, const std::string& password){
-
-        if (userExists(user) == false) {
-            throw UserException("User: " + user + " does NOT EXIST.");
-        }
-
-        std::ifstream in("users.txt");
-        if(!in) {
-            throw FileException("Could NOT OPEN file: users.txt for INPUT");
-        }
-
-        std::vector<std::string> lines;
-        std::string line;
-
-        while (std::getline(in, line)) {
-            lines.push_back(line);
-        }
-        in.close();
-
-
-        for (std::string& l : lines) {
-            std::size_t usrPosition = line.find(':');
-            if (usrPosition == std::string::npos) continue;
-
-            std::size_t pwdPosition = line.find(':', usrPosition + 1);
-            if (pwdPosition == std::string::npos) continue;
-
-            std::string usr = line.substr(0, usrPosition);
-            std::string pwd = line.substr(usrPosition + 1, pwdPosition - (usrPosition + 1));
-
-            if (usr == user && pwd == password) {
-                l = usr + ":" + pwd + ":" + "active";
+    void login(const std::string& user, const std::string& pass) {
+        auto users = load();
+        bool found = false;
+        for (auto& u : users) {
+            if (u.username == user) {
+                found = true;
+                if (u.password != pass) throw AuthException("Bad credentials for user: " + user);
+                u.active = true;
             }
-            else {
-                throw AuthException("User: " + user + " could NOT BE LOGGED IN.");
-            }
-
         }
-
-
-        std::ofstream out("users.txt", std::ios::trunc);
-        if (!out) {
-            throw FileException("Could NOT OPEN file: users.txt for OUTPUT");
-        }
-
-        for (const std::string& l : lines) {
-            out << l << '\n';
-        }
-        out.close();
-
+        if (!found) throw UserException("Unknown user: " + user);
+        save(users);
     }
 
-    void logout(const std::string& user){
-
-        if (userExists(user) == false) {
-            throw UserException("User: " + user + " does NOT EXIST.");
-        }
-
-        if (isAuthenticated(user) == false) {
-            throw AuthException("User: " + user + " NOT AUTHENTICATED.");
-        }
-
-        std::ifstream in("users.txt");
-        if(!in) {
-            throw FileException("Could NOT OPEN file: users.txt for INPUT");
-        }
-
-        std::vector<std::string> lines;
-        std::string line;
-
-        while (std::getline(in, line)) {
-            lines.push_back(line);
-        }
-        in.close();
-
-
-        for (std::string& l : lines) {
-            std::size_t usrPosition = line.find(':');
-            if (usrPosition == std::string::npos) continue;
-
-            std::size_t pwdPosition = line.find(':', usrPosition + 1);
-            if (pwdPosition == std::string::npos) continue;
-
-            std::string usr = line.substr(0, usrPosition);
-            std::string pwd = line.substr(usrPosition + 1, pwdPosition - (usrPosition + 1));
-
-            if (usr == user) {
-                l = usr + ":" + pwd + ":" + "inactive";
+    void logout(const std::string& user) {
+        auto users = load();
+        bool found = false;
+        for (auto& u : users) {
+            if (u.username == user) {
+                found = true;
+                u.active = false;
             }
-            else {
-                throw AuthException("User: " + user + " could NOT BE LOGGED OUT.");
-            }
-
         }
-
-        std::ofstream out("users.txt", std::ios::trunc);
-        if (!out) {
-            throw FileException("Could NOT OPEN file: users.txt for OUTPUT");
-        }
-
-        for (const std::string& l : lines) {
-            out << l << '\n';
-        }
-        out.close();
-
+        if (!found) throw UserException("Unknown user: " + user);
+        save(users);
     }
 
-    bool isAuthenticated(const std::string &user) {
-
-        if (userExists(user) == false) {
-            return false;
-        }
-
-        std::ifstream in("user.txt");
-        if(!in) {
-            return false;
-        }
-
-        std::string line;
-        while (std::getline(in, line)) {
-
-            if (line.empty() || line[0] == '#') continue;
-
-            std::size_t usrPosition = line.find(':');
-            if (usrPosition == std::string::npos) continue;
-
-            std::size_t pwdPosition = line.find(':', usrPosition + 1);
-            if (pwdPosition == std::string::npos) continue;
-
-            std::string usr = line.substr(0, usrPosition);
-            std::string status = line.substr(pwdPosition + 1);
-
-            if (user == usr) {
-                if(status == "active") return true;
-                else return false;
-            }
-
-        }
-
-    }
-
-    bool isAnyUserAuthenticated() {
-
-        std::ifstream in("user.txt");
-        if(!in) {
-            return false;
-        }
-
-        std::string line;
-        while (std::getline(in, line)) {
-
-            if (line.empty() || line[0] == '#') continue;
-
-            std::size_t usrPosition = line.find(':');
-            if (usrPosition == std::string::npos) continue;
-
-            std::size_t pwdPosition = line.find(':', usrPosition + 1);
-            if (pwdPosition == std::string::npos) continue;
-
-            std::string usr = line.substr(0, usrPosition);
-            std::string status = line.substr(pwdPosition + 1);
-
-            if (status == "active") return true;
-
-        }
-
+    bool is_active(const std::string& user) {
+        auto users = load();
+        for (auto& u : users) if (u.username == user) return u.active;
         return false;
-
     }
-
-    bool userExists(const std::string &user) {
-
-        std::ifstream in("users.txt");
-        if(!in) {
-            return false;
-        }
-
-        std::string line;
-        while (std::getline(in, line)) {
-
-            if (line.empty() || line[0] == '#') continue;
-            
-            std:size_t pos = line.find(':');
-            if (pos == std::string::npos) continue;
-
-            if (line.substr(0, pos) == user) return true;
-        }
-
-        return false;
-
-    }
-
-    SessionManager(const SessionManager&) = delete;
-    SessionManager& operator=(const SessionManager&) = delete;
 
 private:
+    struct Rec { std::string username; std::string password; bool active; };
+    std::string db_path = "users.db";
+
+    std::vector<Rec> load() {
+        std::vector<Rec> v;
+        std::ifstream in(db_path);
+        if (!in.good()) return v;
+        std::string line;
+        while (std::getline(in, line)) {
+            std::istringstream iss(line);
+            std::string a,b,c;
+            if (std::getline(iss,a,':') && std::getline(iss,b,':') && std::getline(iss,c,':')) {
+                bool active = (c == "active");
+                v.push_back({a,b,active});
+            }
+        }
+        return v;
+    }
+
+    void save(const std::vector<Rec>& v) {
+        std::ofstream out(db_path, std::ios::trunc);
+        if (!out) throw FileException("Cannot open db file: " + db_path);
+        for (auto& u : v) {
+            out << u.username << ":" << u.password << ":" << (u.active ? "active" : "inactive") << "\n";
+        }
+    }
+
     SessionManager() = default;
     ~SessionManager() = default;
-
-
+    SessionManager(const SessionManager&) = delete;
+    SessionManager& operator=(const SessionManager&) = delete;
 };
