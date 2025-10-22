@@ -40,3 +40,9 @@ public:
     explicit AccessDeniedException(const std::string& msg)
         : CommandException(msg) {}
 };
+
+class UncategorisedError : public CommandException {
+public:
+    explicit UncategorisedError(const std::string& msg)
+        : CommandException(msg) {}
+};

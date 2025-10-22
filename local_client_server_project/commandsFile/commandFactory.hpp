@@ -25,7 +25,7 @@ public:
             return new QuitCommand();
         } else if (comm == "get-logged-users") {
             return new GetLoggedUsersCommand();
-        } else if (comm == "get_proc_info") {
+        } else if (comm == "get-proc-info") {
             return new GetProcInfoCommand(pid);
         } else if (comm == "quit") {
             return new QuitCommand();
