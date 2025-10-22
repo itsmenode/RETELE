@@ -104,6 +104,7 @@ int main() {
                 std::cout << "ERROR: " << e.what() << "\n";
             }
             _exit(0);
+            
         } else if (pid > 0) {
 
             close(sv[1]);
