@@ -95,7 +95,7 @@ int main() {
         close(pfd[0]);
 
         std::string line;
-        std::cout << "Enter commands (e.g. 'signup: user pass', 'login: user pass', 'logout: user', 'get-logged-users', 'get-proc-info: 1', 'quit')\n";
+        std::cout << "Enter commands (Command Examples: 'signup: user pass', 'login: user pass', 'logout: user', 'get-logged-users', 'get-proc-info: 1', 'quit')\n";
         while (true) {
             std::cout << "> ";
             if (!std::getline(std::cin, line)) break;
