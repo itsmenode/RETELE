@@ -65,7 +65,7 @@ int main() {
         while (true) {
             uint32_t len = 0;
             if (!read_all(pfd[0], &len, sizeof(len))) break;
-            
+
             std::string line(len, '\0');
             if (len && !read_all(pfd[0], line.data(), len)) break;
 
@@ -83,7 +83,9 @@ int main() {
 
             if (line == "quit") break;
         }
-
+        
+        std::cout.flush();
+        std::cerr.flush();
         close(cmd_fd);
         close(resp_fd);
         close(pfd[0]);

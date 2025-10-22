@@ -1,2 +1,2 @@
-admin:adminpass:active
-test:test:inactive
+admin:adminpass:inactive
+test:test:active

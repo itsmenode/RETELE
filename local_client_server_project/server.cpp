@@ -98,6 +98,8 @@ int main() {
                 Command* c = CommandFactory::create(name, user, pass, cpid);
                 c->execute();
                 delete c;
+                std::cout.flush();
+                std::cerr.flush();
             } catch (const std::exception& e) {
                 std::cout << "ERROR: " << e.what() << "\n";
             }
@@ -118,7 +120,7 @@ int main() {
             waitpid(pid, nullptr, 0);
 
             uint32_t out_len = (uint32_t)buf.size();
-            
+
             write_all(resp_fd, &out_len, sizeof(out_len));
             if (out_len) write_all(resp_fd, buf.data(), out_len);
 
