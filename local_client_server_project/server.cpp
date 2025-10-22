@@ -80,6 +80,27 @@ int main(){
         if (pid == 0) {
             close(sv[0]);
             char buf[256];
+
+            ssize_t n = read(sv[1], buf, sizeof(buf) - 1);
+
+            buf[n] = '\0';
+
+            string cmd, a1, a2;
+
+            parse_command(buf, cmd, a1, a2);
+            pid_t pid2 = static_cast<pid_t>(std::stol(a1));
+
+            CommandFactory factory;
+
+            Command* commandPtr = factory.createCommand(cmd, a1, a2, pid2);
+            if (commandPtr) {
+                commandPtr->execute();
+                delete commandPtr;
+            }
+
+            close(sv[1]);
+
+
         } else {
 
             close(sv[1]);
