@@ -1,6 +1,7 @@
 
 #pragma once
 #include "command.hpp"
+#include "../sessionManager.hpp"
 #include <fstream>
 #include <iostream>
 #include <string>
